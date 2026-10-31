@@ -36,6 +36,14 @@ func (s *threatService) Create(ctx context.Context, threat *domain.Threat) error
 }
 
 func (s *threatService) Update(ctx context.Context, threat *domain.Threat) error {
+	if err := validateThreat(threat); err != nil {
+		return err
+	}
+
+	if err := s.repo.Update(ctx, threat); err != nil {
+		return err
+	}
+
 	return nil
 }
 
