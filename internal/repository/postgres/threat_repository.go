@@ -7,6 +7,7 @@ import (
 	"threat-intelligence/internal/domain"
 	"threat-intelligence/internal/repository"
 
+	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -86,6 +87,49 @@ func (r *ThreatRepository) GetByMD5(ctx context.Context, targetMD5 string) (*dom
 	threat.Source = source
 
 	return &threat, nil
+}
+
+func (r *ThreatRepository) Create(ctx context.Context, threat *domain.Threat) error {
+	query := `
+	INSERT INTO threats (
+		md5, 
+		sha256,
+		name,
+		family, 
+		type, 
+		severity, 
+		confidence, 
+		description, 
+		tags, 
+		source
+	) 
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
+
+	_, err := r.pool.Exec(ctx, query,
+		threat.MD5,
+		threat.SHA256,
+		threat.Name,
+		threat.Family,
+		threat.Type,
+		threat.Severity,
+		threat.Confidence,
+		threat.Description,
+		threat.Tags,
+		threat.Source)
+
+	if err != nil {
+		var pgErr *pgconn.PgError
+
+		if errors.As(err, &pgErr) {
+			switch pgErr.Code {
+			case "23505":
+				return domain.ErrThreatAlreadyExists
+			}
+		}
+		return err
+	}
+
+	return nil
 }
 
 var _ repository.ThreatRepository = (*ThreatRepository)(nil)

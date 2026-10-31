@@ -22,6 +22,16 @@ func (s *threatService) GetByMD5(ctx context.Context, targetMD5 string) (*domain
 }
 
 func (s *threatService) Create(ctx context.Context, threat *domain.Threat) error {
+	validateErr := validateThreat(threat)
+	if validateErr != nil {
+		return validateErr
+	}
+
+	createErr := s.repo.Create(ctx, threat)
+	if createErr != nil {
+		return createErr
+	}
+
 	return nil
 }
 
