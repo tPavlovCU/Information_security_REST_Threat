@@ -132,4 +132,43 @@ func (r *ThreatRepository) Create(ctx context.Context, threat *domain.Threat) er
 	return nil
 }
 
+func (r *ThreatRepository) Update(ctx context.Context, threat *domain.Threat) error {
+	query := `
+	UPDATE threats
+	SET
+		sha256 = $1,
+		name = $2,
+		family = $3,
+		type = $4,
+		severity = $5,
+		confidence = $6,
+		description = $7,
+		tags = $8,
+		source = $9,
+		updated_at = NOW()
+	WHERE md5 = $10
+	`
+
+	tag, err := r.pool.Exec(ctx, query,
+		threat.SHA256,
+		threat.Name,
+		threat.Family,
+		threat.Type,
+		threat.Severity,
+		threat.Confidence,
+		threat.Description,
+		threat.Tags,
+		threat.Source,
+		threat.MD5)
+
+	if err != nil {
+		return err
+	}
+
+	if tag.RowsAffected() == 0 {
+		return domain.ErrThreatNotFound
+	}
+	return nil
+}
+
 var _ repository.ThreatRepository = (*ThreatRepository)(nil)
