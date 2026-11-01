@@ -1,15 +1,15 @@
 package domain
 
 type Threat struct {
-	ID          int64
-	MD5         string
-	SHA256      *string
-	Name        string
-	Family      *string
-	Type        string
-	Severity    string
-	Confidence  *int16
-	Description *string
-	Tags        []string
-	Source      *string
+	ID          int64    `json:"id"`
+	MD5         string   `json:"md5"`
+	SHA256      *string  `json:"sha256"`
+	Name        string   `json:"name"`
+	Family      *string  `json:"family"`
+	Type        string   `json:"type"`
+	Severity    string   `json:"severity"`
+	Confidence  *int16   `json:"confidence"`
+	Description *string  `json:"description"`
+	Tags        []string `json:"tags"`
+	Source      *string  `json:"source"`
 }

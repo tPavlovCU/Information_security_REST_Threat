@@ -18,6 +18,9 @@ func NewThreatService(repo repository.ThreatRepository) ThreatService {
 }
 
 func (s *threatService) GetByMD5(ctx context.Context, targetMD5 string) (*domain.Threat, error) {
+	if md5validate := validateMD5(targetMD5); md5validate != nil {
+		return nil, md5validate
+	}
 	return s.repo.GetByMD5(ctx, targetMD5)
 }
 
