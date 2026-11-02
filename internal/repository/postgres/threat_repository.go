@@ -106,6 +106,10 @@ func (r *ThreatRepository) Create(ctx context.Context, threat *domain.Threat) er
 		source
 	) 
 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
+	tags := threat.Tags
+	if threat.Tags == nil {
+		tags = []string{}
+	}
 
 	_, err := r.pool.Exec(ctx, query,
 		threat.MD5,
@@ -116,7 +120,7 @@ func (r *ThreatRepository) Create(ctx context.Context, threat *domain.Threat) er
 		threat.Severity,
 		threat.Confidence,
 		threat.Description,
-		threat.Tags,
+		tags,
 		threat.Source)
 
 	if err != nil {

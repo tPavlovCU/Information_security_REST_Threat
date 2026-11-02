@@ -207,3 +207,25 @@ func TestUpdate_NotFound(t *testing.T) {
 		t.Fatalf("expected ErrThreatNotFound, got: %v", err)
 	}
 }
+
+func TestCreate_NoTags(t *testing.T) {
+	pool := setupTestDB(t)
+	repo := postgres.NewThreatRepository(pool)
+
+	threat := &domain.Threat{
+		MD5:      "0123456789abcdef0123456789abcdef",
+		Name:     "Test Threat",
+		Type:     domain.ThreatTypeTrojan,
+		Severity: domain.ThreatSeverityHigh,
+	}
+
+	if err := repo.Create(context.Background(), threat); err != nil {
+		t.Fatalf("failed to create initial threat: %v", err)
+	}
+
+	err := repo.Create(context.Background(), threat)
+
+	if !errors.Is(err, domain.ErrThreatAlreadyExists) {
+		t.Fatalf("expected ErrThreatAlreadyExists, got: %v", err)
+	}
+}
