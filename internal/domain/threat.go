@@ -13,3 +13,17 @@ type Threat struct {
 	Tags        []string `json:"tags"`
 	Source      *string  `json:"source"`
 }
+
+const (
+	ThreatTypeTrojan     = "trojan"
+	ThreatTypeRansomware = "ransomware"
+	ThreatTypeVirus      = "virus"
+	ThreatTypeSpyware    = "spyware"
+)
+
+const (
+	ThreatSeverityLow      = "low"
+	ThreatSeverityMedium   = "medium"
+	ThreatSeverityHigh     = "high"
+	ThreatSeverityCritical = "critical"
+)
