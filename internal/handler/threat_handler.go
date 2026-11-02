@@ -114,6 +114,7 @@ func (h *ThreatHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, domain.ErrThreatNotFound) {
 			http.Error(w, "Threat not found", http.StatusNotFound)
+			return
 		}
 
 		if errors.Is(err, domain.ErrBadMD5) {

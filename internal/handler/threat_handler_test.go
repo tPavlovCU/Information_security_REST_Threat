@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	//"threat-intelligence/internal/service"
@@ -22,6 +23,10 @@ type mockThreatService struct {
 	createErr     error
 	createdThreat *domain.Threat
 	createCalls   int
+
+	updateErr     error
+	updatedThreat *domain.Threat
+	updateCalls   int
 }
 
 func (s *mockThreatService) Create(ctx context.Context, threat *domain.Threat) error {
@@ -36,7 +41,9 @@ func (s *mockThreatService) GetByMD5(ctx context.Context, targetMD5 string) (*do
 }
 
 func (s *mockThreatService) Update(ctx context.Context, threat *domain.Threat) error {
-	return nil
+	s.updateCalls++
+	s.updatedThreat = threat
+	return s.updateErr
 }
 
 func TestGetByMD5_InvalidMD5(t *testing.T) {
@@ -317,5 +324,197 @@ func TestCreate_EmptyName(t *testing.T) {
 
 	if mock.createCalls != 1 {
 		t.Errorf("expected 1 call to Create, got %d", mock.createCalls)
+	}
+}
+
+func TestUpdate_Success(t *testing.T) {
+	mock := &mockThreatService{}
+
+	md5 := "d41d8cd98f00b204e9800998ecf8427e"
+
+	updateBody := `{
+        "name": "Updated Threat",
+        "type": "ransomware",
+        "severity": "critical"
+    }`
+
+	handler := NewThreatHandler(mock)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("PUT /info/{md5}", handler.Update)
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/info/"+md5,
+		strings.NewReader(updateBody),
+	)
+
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d",
+			http.StatusOK, rec.Code)
+	}
+
+	if mock.updateCalls != 1 {
+		t.Errorf("expected 1 Update call, got %d", mock.updateCalls)
+	}
+
+	if mock.updatedThreat == nil {
+		t.Fatal("expected updated threat, got nil")
+	}
+
+	if mock.updatedThreat.MD5 != md5 {
+		t.Errorf("expected MD5 %s, got %s",
+			md5, mock.updatedThreat.MD5)
+	}
+
+	if mock.updatedThreat.Name != "Updated Threat" {
+		t.Errorf("expected name Updated Threat, got %s",
+			mock.updatedThreat.Name)
+	}
+
+	if mock.updatedThreat.Type != "ransomware" {
+		t.Errorf("expected type ransomware, got %s",
+			mock.updatedThreat.Type)
+	}
+
+	if mock.updatedThreat.Severity != "critical" {
+		t.Errorf("expected severity critical, got %s",
+			mock.updatedThreat.Severity)
+	}
+}
+
+func TestUpdate_InvalidJSON(t *testing.T) {
+	mock := &mockThreatService{}
+
+	handler := NewThreatHandler(mock)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("PUT /info/{md5}", handler.Update)
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/info/d41d8cd98f00b204e9800998ecf8427e",
+		strings.NewReader(`{"name": invalid json}`),
+	)
+
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d",
+			http.StatusBadRequest, rec.Code)
+	}
+
+	if mock.updateCalls != 0 {
+		t.Errorf("expected 0 Update calls, got %d", mock.updateCalls)
+	}
+}
+
+func TestUpdate_NotFound(t *testing.T) {
+	mock := &mockThreatService{
+		updateErr: domain.ErrThreatNotFound,
+	}
+
+	handler := NewThreatHandler(mock)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("PUT /info/{md5}", handler.Update)
+
+	body := `{
+        "name": "Updated Threat",
+        "type": "trojan",
+        "severity": "high"
+    }`
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/info/d41d8cd98f00b204e9800998ecf8427e",
+		strings.NewReader(body),
+	)
+
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d",
+			http.StatusNotFound, rec.Code)
+	}
+
+	if mock.updateCalls != 1 {
+		t.Errorf("expected 1 Update call, got %d", mock.updateCalls)
+	}
+}
+
+func TestUpdate_InvalidMD5(t *testing.T) {
+	mock := &mockThreatService{
+		updateErr: domain.ErrBadMD5,
+	}
+
+	handler := NewThreatHandler(mock)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("PUT /info/{md5}", handler.Update)
+
+	body := `{
+        "name": "Updated Threat",
+        "type": "trojan",
+        "severity": "high"
+    }`
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/info/12345",
+		strings.NewReader(body),
+	)
+
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d",
+			http.StatusBadRequest, rec.Code)
+	}
+}
+
+func TestUpdate_InternalError(t *testing.T) {
+	mock := &mockThreatService{
+		updateErr: errors.New("database connection failed"),
+	}
+
+	handler := NewThreatHandler(mock)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("PUT /info/{md5}", handler.Update)
+
+	body := `{
+        "name": "Updated Threat",
+        "type": "trojan",
+        "severity": "high"
+    }`
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/info/d41d8cd98f00b204e9800998ecf8427e",
+		strings.NewReader(body),
+	)
+
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("expected status %d, got %d",
+			http.StatusInternalServerError, rec.Code)
+	}
+
+	if strings.Contains(rec.Body.String(), "database connection failed") {
+		t.Error("internal error details should not be exposed to client")
 	}
 }
