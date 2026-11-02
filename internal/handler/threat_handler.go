@@ -79,7 +79,7 @@ func (h *ThreatHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if errors.Is(err, domain.ErrThreatAlreadyExists) {
-			http.Error(w, "Bad request", http.StatusConflict)
+			http.Error(w, "Threat already exists", http.StatusConflict)
 			return
 		}
 
@@ -95,4 +95,60 @@ func (h *ThreatHandler) Create(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(res)
+}
+
+func (h *ThreatHandler) Update(w http.ResponseWriter, r *http.Request) {
+	var data domain.Threat
+
+	ctx := r.Context()
+	err := json.NewDecoder(r.Body).Decode(&data)
+
+	if err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	md5 := r.PathValue("md5")
+	data.MD5 = md5
+
+	err = h.service.Update(ctx, &data)
+	if err != nil {
+		if errors.Is(err, domain.ErrThreatNotFound) {
+			http.Error(w, "Threat not found", http.StatusNotFound)
+		}
+
+		if errors.Is(err, domain.ErrBadMD5) {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+
+		if errors.Is(err, domain.ErrBadConfidence) {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+
+		if errors.Is(err, domain.ErrBadSeverity) {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+
+		if errors.Is(err, domain.ErrBadType) {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+
+		if errors.Is(err, domain.ErrEmptyName) {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+
+		if errors.Is(err, domain.ErrThreatAlreadyExists) {
+			http.Error(w, "Threat already exists", http.StatusConflict)
+			return
+		}
+
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
