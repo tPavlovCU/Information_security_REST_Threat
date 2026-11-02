@@ -1,11 +1,14 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
 	//"threat-intelligence/internal/service"
 
 	"threat-intelligence/internal/domain"
@@ -15,10 +18,16 @@ type mockThreatService struct {
 	threat       *domain.Threat
 	getByMD5Err  error
 	requestedMD5 string
+
+	createErr     error
+	createdThreat *domain.Threat
+	createCalls   int
 }
 
 func (s *mockThreatService) Create(ctx context.Context, threat *domain.Threat) error {
-	return nil
+	s.createCalls++
+	s.createdThreat = threat
+	return s.createErr
 }
 
 func (s *mockThreatService) GetByMD5(ctx context.Context, targetMD5 string) (*domain.Threat, error) {
@@ -31,7 +40,10 @@ func (s *mockThreatService) Update(ctx context.Context, threat *domain.Threat) e
 }
 
 func TestGetByMD5_InvalidMD5(t *testing.T) {
-	mock := &mockThreatService{nil, domain.ErrBadMD5, ""}
+	mock := &mockThreatService{
+		threat:       nil,
+		getByMD5Err:  domain.ErrBadMD5,
+		requestedMD5: ""}
 	handler := NewThreatHandler(mock)
 
 	mux := http.NewServeMux()
@@ -47,7 +59,10 @@ func TestGetByMD5_InvalidMD5(t *testing.T) {
 }
 
 func TestGetByMD5_NotFound(t *testing.T) {
-	mock := &mockThreatService{nil, domain.ErrThreatNotFound, ""}
+	mock := &mockThreatService{
+		threat:       nil,
+		getByMD5Err:  domain.ErrThreatNotFound,
+		requestedMD5: ""}
 	handler := NewThreatHandler(mock)
 
 	mux := http.NewServeMux()
@@ -63,12 +78,15 @@ func TestGetByMD5_NotFound(t *testing.T) {
 }
 
 func TestGetByMD5_Success(t *testing.T) {
-	mock := &mockThreatService{&domain.Threat{
-		MD5:      "d41d8cd98f00b204e9800998ecf8427e",
-		Name:     "Test Threat",
-		Type:     "trojan",
-		Severity: "high",
-	}, nil, ""}
+	mock := &mockThreatService{
+		threat: &domain.Threat{
+			MD5:      "d41d8cd98f00b204e9800998ecf8427e",
+			Name:     "Test Threat",
+			Type:     "trojan",
+			Severity: "high",
+		},
+		getByMD5Err:  nil,
+		requestedMD5: ""}
 
 	handler := NewThreatHandler(mock)
 	mux := http.NewServeMux()
@@ -109,5 +127,195 @@ func TestGetByMD5_Success(t *testing.T) {
 
 	if mock.requestedMD5 != "d41d8cd98f00b204e9800998ecf8427e" {
 		t.Errorf("unexpected rrequested MD5: %s", mock.requestedMD5)
+	}
+}
+
+func TestCreate_Success(t *testing.T) {
+
+	mock := &mockThreatService{}
+
+	createBody := &domain.Threat{
+		MD5:      "d41d8cd98f00b204e9800998ecf8427e",
+		Name:     "Test Threat",
+		Type:     "trojan",
+		Severity: "high",
+	}
+
+	body, err := json.Marshal(createBody)
+	if err != nil {
+		t.Fatalf("failed to marshal request body: %v", err)
+	}
+
+	handler := NewThreatHandler(mock)
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /info", handler.Create)
+
+	req := httptest.NewRequest(http.MethodPost, "/info", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+	var got CreateResult
+
+	if rec.Code != http.StatusCreated {
+		t.Errorf("expected status %d, got %d", http.StatusCreated, rec.Code)
+		return
+	}
+
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("failed to decode response")
+	}
+
+	if got.MD5 != createBody.MD5 {
+		t.Errorf("expected MD5 %s, got %s", createBody.MD5, got.MD5)
+	}
+
+	if got.Name != createBody.Name {
+		t.Errorf("expected Name %s, got %s", createBody.Name, got.Name)
+	}
+
+	contentType := rec.Header().Get("Content-Type")
+	if contentType != "application/json; charset=utf-8" {
+		t.Errorf("expected Content-Type application/json; charset=utf-8, got %s", contentType)
+	}
+
+	if mock.createCalls != 1 {
+		t.Errorf("expected Create to be called once, got %d", mock.createCalls)
+	}
+
+	if mock.createdThreat == nil {
+		t.Fatal("expected service to receive a threat, got nil")
+	}
+
+	if mock.createdThreat.MD5 != createBody.MD5 {
+		t.Errorf("service received wrong MD5")
+	}
+}
+
+func TestCreate_InvalidJSON(t *testing.T) {
+
+	mock := &mockThreatService{}
+
+	body := []byte(`{"md5": invalid json}`)
+
+	handler := NewThreatHandler(mock)
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /info", handler.Create)
+
+	req := httptest.NewRequest(http.MethodPost, "/info", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+
+	if mock.createCalls != 0 {
+		t.Errorf("expected 0 calls to Create, got %d", mock.createCalls)
+	}
+}
+
+func TestCreate_ThreatAlreadyExists(t *testing.T) {
+	mock := &mockThreatService{
+		createErr: domain.ErrThreatAlreadyExists,
+	}
+
+	createBody := &domain.Threat{
+		MD5:      "d41d8cd98f00b204e9800998ecf8427e",
+		Name:     "Test Threat",
+		Type:     "trojan",
+		Severity: "high",
+	}
+
+	body, err := json.Marshal(createBody)
+	if err != nil {
+		t.Fatalf("failed to marshal request body: %v", err)
+	}
+
+	handler := NewThreatHandler(mock)
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /info", handler.Create)
+
+	req := httptest.NewRequest(http.MethodPost, "/info", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("expected status %d, got %d", http.StatusConflict, rec.Code)
+	}
+
+	if mock.createCalls != 1 {
+		t.Errorf("expected 1 call to Create, got %d", mock.createCalls)
+	}
+}
+
+func TestCreate_InternalError(t *testing.T) {
+	mock := &mockThreatService{
+		createErr: errors.New("db connection failed"),
+	}
+
+	createBody := &domain.Threat{
+		MD5:      "d41d8cd98f00b204e9800998ecf8427e",
+		Name:     "Test Threat",
+		Type:     "trojan",
+		Severity: "high",
+	}
+
+	body, err := json.Marshal(createBody)
+	if err != nil {
+		t.Fatalf("failed to marshal request body: %v", err)
+	}
+
+	handler := NewThreatHandler(mock)
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /info", handler.Create)
+
+	req := httptest.NewRequest(http.MethodPost, "/info", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, rec.Code)
+	}
+
+	if mock.createCalls != 1 {
+		t.Errorf("expected 1 call to Create, got %d", mock.createCalls)
+	}
+}
+
+func TestCreate_EmptyName(t *testing.T) {
+	mock := &mockThreatService{
+		createErr: domain.ErrEmptyName,
+	}
+
+	createBody := &domain.Threat{
+		MD5:      "d41d8cd98f00b204e9800998ecf8427e",
+		Name:     "",
+		Type:     "trojan",
+		Severity: "high",
+	}
+
+	body, err := json.Marshal(createBody)
+	if err != nil {
+		t.Fatalf("failed to marshal request body: %v", err)
+	}
+
+	handler := NewThreatHandler(mock)
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /info", handler.Create)
+
+	req := httptest.NewRequest(http.MethodPost, "/info", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+
+	if mock.createCalls != 1 {
+		t.Errorf("expected 1 call to Create, got %d", mock.createCalls)
 	}
 }
