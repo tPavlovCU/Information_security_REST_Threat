@@ -7,8 +7,8 @@ import (
 	"threat-intelligence/internal/domain"
 	"threat-intelligence/internal/repository"
 
-	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -17,7 +17,9 @@ type ThreatRepository struct {
 }
 
 func NewThreatRepository(pool *pgxpool.Pool) *ThreatRepository {
-	return &ThreatRepository{pool}
+	return &ThreatRepository{
+		pool: pool,
+	}
 }
 
 func (r *ThreatRepository) GetByMD5(ctx context.Context, targetMD5 string) (*domain.Threat, error) {
