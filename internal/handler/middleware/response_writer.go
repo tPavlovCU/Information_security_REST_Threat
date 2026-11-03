@@ -9,7 +9,7 @@ type responseWriter struct {
 	statusCode int
 }
 
-func (rw *responseWriter) WriteHeader(statusCode int) {
+func (rw responseWriter) WriteHeader(statusCode int) {
 	if rw.statusCode != 0 {
 		return
 	}
@@ -17,7 +17,7 @@ func (rw *responseWriter) WriteHeader(statusCode int) {
 	rw.ResponseWriter.WriteHeader(statusCode)
 }
 
-func (rw *responseWriter) Write(b []byte) (int, error) {
+func (rw responseWriter) Write(b []byte) (int, error) {
 	if rw.statusCode == 0 {
 		rw.WriteHeader(http.StatusOK)
 	}
