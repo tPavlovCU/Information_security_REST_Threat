@@ -4,6 +4,10 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"threat-intelligence/internal/config"
 	"threat-intelligence/internal/database"
@@ -26,8 +30,12 @@ func main() {
 		return
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
+	defer stop()
 
 	pool, err := database.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -58,7 +66,38 @@ func main() {
 
 	log.Printf("Server starting on port %s", cfg.HTTPPort)
 
-	if err := server.ListenAndServe(); err != nil {
-		log.Printf("HTTP server error: %v", err)
+	serverErrors := make(chan error, 1)
+
+	go func() {
+		serverErrors <- server.ListenAndServe()
+	}()
+
+	select {
+	case err := <-serverErrors:
+		if err != nil && err != http.ErrServerClosed {
+			log.Printf("Server error: %v", err)
+		}
+		return
+	case <-ctx.Done():
+		log.Printf("Shutdown signal received")
+		shutDownCtx, cancel := context.WithTimeout(
+			context.Background(),
+			10*time.Second,
+		)
+		defer cancel()
+
+		if err := server.Shutdown(shutDownCtx); err != nil {
+			log.Printf("Graceful shutdown failed: %v", err)
+			if err := server.Close(); err != nil {
+				log.Printf("Force close failed: %v", err)
+			}
+		}
+
+		err := <-serverErrors
+		if err != nil && err != http.ErrServerClosed {
+			log.Printf("Server error during shutdown: %v", err)
+		}
+
+		log.Println("Server stopped")
 	}
 }
