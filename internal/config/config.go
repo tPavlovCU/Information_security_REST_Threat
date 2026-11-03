@@ -12,6 +12,7 @@ type Config struct {
 	DatabaseURL      string
 	HTTPReadTimeout  time.Duration
 	HTTPWriteTimeout time.Duration
+	APIKey           string
 }
 
 func getEnv(key, fallback string) string {
@@ -23,6 +24,7 @@ func getEnv(key, fallback string) string {
 }
 
 var ErrNoDatabaseURL = errors.New("No DATABASE_URL in env")
+var ErrNoAPIKey = errors.New("No API_KEY in env")
 
 func Load() (*Config, error) {
 	var cfg Config
@@ -48,6 +50,12 @@ func Load() (*Config, error) {
 	}
 
 	cfg.HTTPWriteTimeout = writeTime
+
+	apiKey := os.Getenv("API_KEY")
+	if apiKey == "" {
+		return nil, ErrNoAPIKey
+	}
+	cfg.APIKey = apiKey
 
 	return &cfg, nil
 }

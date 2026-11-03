@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"testing"
 	"time"
 )
@@ -10,6 +11,7 @@ func TestLoad_Success(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://user:password@localhost:5432/test_db")
 	t.Setenv("HTTP_READ_TIMEOUT", "3s")
 	t.Setenv("HTTP_WRITE_TIMEOUT", "7s")
+	t.Setenv("API_KEY", "smt")
 
 	cfg, err := Load()
 	if err != nil {
@@ -27,6 +29,10 @@ func TestLoad_Success(t *testing.T) {
 	if cfg.HTTPWriteTimeout != 7*time.Second {
 		t.Errorf("expected write timeout 7s, got %v", cfg.HTTPWriteTimeout)
 	}
+
+	if cfg.APIKey != "smt" {
+		t.Errorf("expected API_KEY smt, got %v", cfg.APIKey)
+	}
 }
 
 func TestLoad_DefaultValues(t *testing.T) {
@@ -34,6 +40,7 @@ func TestLoad_DefaultValues(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://user:password@localhost:5432/test_db")
 	t.Setenv("HTTP_READ_TIMEOUT", "")
 	t.Setenv("HTTP_WRITE_TIMEOUT", "")
+	t.Setenv("API_KEY", "smt")
 
 	cfg, err := Load()
 	if err != nil {
@@ -51,14 +58,29 @@ func TestLoad_DefaultValues(t *testing.T) {
 	if cfg.HTTPWriteTimeout != 10*time.Second {
 		t.Errorf("expected default write timeout 10s, got %v", cfg.HTTPWriteTimeout)
 	}
+
+	if cfg.APIKey != "smt" {
+		t.Errorf("expected API_KEY smt, got %v", cfg.APIKey)
+	}
 }
 
 func TestLoad_MissingDatabaseURL(t *testing.T) {
 	t.Setenv("DATABASE_URL", "")
+	t.Setenv("API_KEY", "a")
 
 	_, err := Load()
-	if err == nil {
+	if !errors.Is(err, ErrNoDatabaseURL) {
 		t.Fatal("expected error when DATABASE_URL is missing")
+	}
+}
+
+func TestLoad_MissingAPIKey(t *testing.T) {
+	t.Setenv("DATABASE_URL", "a")
+	t.Setenv("API_KEY", "")
+
+	_, err := Load()
+	if !errors.Is(err, ErrNoAPIKey) {
+		t.Fatal("expected error when API_KEY is missing")
 	}
 }
 

@@ -41,7 +41,6 @@ func TestLoggingRecoveryMiddleware_Panic(t *testing.T) {
 		t.Errorf("expected status=500 in logs, got: %s", logOutput)
 	}
 
-	// Проверяем, что RecoveryMiddleware записал panic.
 	if !strings.Contains(logOutput, "unexpected error") {
 		t.Errorf("expected panic message in logs, got: %s", logOutput)
 	}
