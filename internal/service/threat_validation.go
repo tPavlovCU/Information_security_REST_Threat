@@ -34,7 +34,7 @@ func validateThreat(threat *domain.Threat) error {
 	//проверка Name
 	name := threat.Name
 	threat.Name = strings.TrimSpace(name)
-	if name == "" {
+	if threat.Name == "" {
 		return domain.ErrEmptyName
 	}
 
