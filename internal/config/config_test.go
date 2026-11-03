@@ -12,6 +12,8 @@ func TestLoad_Success(t *testing.T) {
 	t.Setenv("HTTP_READ_TIMEOUT", "3s")
 	t.Setenv("HTTP_WRITE_TIMEOUT", "7s")
 	t.Setenv("API_KEY", "smt")
+	t.Setenv("RATE_LIMIT", "50")
+	t.Setenv("RATE_WINDOW", "2m")
 
 	cfg, err := Load()
 	if err != nil {
@@ -33,6 +35,14 @@ func TestLoad_Success(t *testing.T) {
 	if cfg.APIKey != "smt" {
 		t.Errorf("expected API_KEY smt, got %v", cfg.APIKey)
 	}
+
+	if cfg.RateLimit != 50 {
+		t.Errorf("expected rate limit 50, got %d", cfg.RateLimit)
+	}
+
+	if cfg.RateWindow != 2*time.Minute {
+		t.Errorf("expected rate window 2m, got %v", cfg.RateWindow)
+	}
 }
 
 func TestLoad_DefaultValues(t *testing.T) {
@@ -41,6 +51,8 @@ func TestLoad_DefaultValues(t *testing.T) {
 	t.Setenv("HTTP_READ_TIMEOUT", "")
 	t.Setenv("HTTP_WRITE_TIMEOUT", "")
 	t.Setenv("API_KEY", "smt")
+	t.Setenv("RATE_LIMIT", "")
+	t.Setenv("RATE_WINDOW", "")
 
 	cfg, err := Load()
 	if err != nil {
@@ -61,6 +73,14 @@ func TestLoad_DefaultValues(t *testing.T) {
 
 	if cfg.APIKey != "smt" {
 		t.Errorf("expected API_KEY smt, got %v", cfg.APIKey)
+	}
+
+	if cfg.RateLimit != 100 {
+		t.Errorf("expected default rate limit 100, got %d", cfg.RateLimit)
+	}
+
+	if cfg.RateWindow != time.Minute {
+		t.Errorf("expected default rate window 1m, got %v", cfg.RateWindow)
 	}
 }
 
