@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -22,13 +21,14 @@ import (
 
 func main() {
 	err := godotenv.Load()
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	if err != nil {
-		log.Printf("No .env file found: %v", err)
+		logger.Warn("No .env file found", slog.Any("err", err))
 	}
 
 	cfg, err := config.Load()
 	if err != nil {
-		log.Printf("Cant read config file: %v", err)
+		logger.Error("Failed to load config", slog.Any("err", err))
 		return
 	}
 
@@ -41,7 +41,7 @@ func main() {
 
 	pool, err := database.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Printf("Cant make database pool: %v", err)
+		logger.Error("Failed to create database pool", slog.Any("err", err))
 		return
 	}
 
@@ -59,7 +59,6 @@ func main() {
 	mux.HandleFunc("POST /info", threatHandler.Create)
 	mux.HandleFunc("PUT /info/{md5}", threatHandler.Update)
 
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	var handler http.Handler = mux
 
 	handler = middleware.LoggingMiddleware(logger, handler)
@@ -72,7 +71,7 @@ func main() {
 		WriteTimeout: cfg.HTTPWriteTimeout,
 	}
 
-	log.Printf("Server starting on port %s", cfg.HTTPPort)
+	logger.Info("Server starting", slog.String("port", cfg.HTTPPort))
 
 	serverErrors := make(chan error, 1)
 
@@ -83,11 +82,11 @@ func main() {
 	select {
 	case err := <-serverErrors:
 		if err != nil && err != http.ErrServerClosed {
-			log.Printf("Server error: %v", err)
+			logger.Error("Server error", slog.Any("err", err))
 		}
 		return
 	case <-ctx.Done():
-		log.Printf("Shutdown signal received")
+		logger.Info("Shutdown signal received")
 		shutDownCtx, cancel := context.WithTimeout(
 			context.Background(),
 			10*time.Second,
@@ -95,17 +94,17 @@ func main() {
 		defer cancel()
 
 		if err := server.Shutdown(shutDownCtx); err != nil {
-			log.Printf("Graceful shutdown failed: %v", err)
+			logger.Error("Graceful shutdown failed", slog.Any("err", err))
 			if err := server.Close(); err != nil {
-				log.Printf("Force close failed: %v", err)
+				logger.Error("Force close failed", slog.Any("err", err))
 			}
 		}
 
 		err := <-serverErrors
 		if err != nil && err != http.ErrServerClosed {
-			log.Printf("Server error during shutdown: %v", err)
+			logger.Error("Server error during shutdown", slog.Any("err", err))
 		}
 
-		log.Println("Server stopped")
+		logger.Info("Server stopped")
 	}
 }
