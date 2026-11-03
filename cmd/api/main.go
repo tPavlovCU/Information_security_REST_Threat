@@ -12,6 +12,7 @@ import (
 	"threat-intelligence/internal/config"
 	"threat-intelligence/internal/database"
 	"threat-intelligence/internal/handler"
+	"threat-intelligence/internal/handler/middleware"
 	"threat-intelligence/internal/repository/postgres"
 	"threat-intelligence/internal/service"
 
@@ -59,7 +60,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:         ":" + cfg.HTTPPort,
-		Handler:      mux,
+		Handler:      middleware.RequestIDMiddleware(mux),
 		ReadTimeout:  cfg.HTTPReadTimeout,
 		WriteTimeout: cfg.HTTPWriteTimeout,
 	}
