@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -58,9 +59,15 @@ func main() {
 	mux.HandleFunc("POST /info", threatHandler.Create)
 	mux.HandleFunc("PUT /info/{md5}", threatHandler.Update)
 
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	var handler http.Handler = mux
+
+	handler = middleware.LoggingMiddleware(logger, handler)
+	handler = middleware.RequestIDMiddleware(handler)
+
 	server := &http.Server{
 		Addr:         ":" + cfg.HTTPPort,
-		Handler:      middleware.RequestIDMiddleware(mux),
+		Handler:      handler,
 		ReadTimeout:  cfg.HTTPReadTimeout,
 		WriteTimeout: cfg.HTTPWriteTimeout,
 	}
