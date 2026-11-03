@@ -1,0 +1,428 @@
+openapi: 3.0.0
+
+info:
+  title: Threat Intelligence API
+  description: REST API for managing threat intelligence data.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: Threats
+    description: Operations for managing threat intelligence records
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /info/{md5}:
+    get:
+      tags:
+        - Threats
+      summary: Get threat by MD5
+      operationId: getThreatByMD5
+
+      parameters:
+        - name: md5
+          in: path
+          required: true
+          description: MD5 hash of the threat
+          schema:
+            type: string
+            pattern: '^[a-fA-F0-9]{32}$'
+            example: d41d8cd98f00b204e9800998ecf8427e
+
+      responses:
+        '200':
+          description: Threat found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreatResponse'
+
+        '400':
+          description: Invalid MD5 format
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: Bad request
+
+        '401':
+          description: Unauthorized - invalid or missing API key
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: Unauthorized
+
+        '404':
+          description: Threat not found
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: threat not found
+
+        '429':
+          description: Rate limit exceeded
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: Too Many Requests
+
+        '500':
+          description: Internal server error
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: internal server error
+
+    put:
+      tags:
+        - Threats
+      summary: Update an existing threat
+      description: Replaces all mutable fields of an existing threat.
+      operationId: updateThreat
+
+      parameters:
+        - name: md5
+          in: path
+          required: true
+          description: MD5 hash identifying the threat
+          schema:
+            type: string
+            pattern: '^[a-fA-F0-9]{32}$'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThreatUpdateRequest'
+
+      responses:
+        '200':
+          description: Threat successfully updated
+
+        '400':
+          description: Invalid request data
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: Bad request
+
+        '401':
+          description: Unauthorized - invalid or missing API key
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: Unauthorized
+
+        '404':
+          description: Threat not found
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: threat not found
+
+        '429':
+          description: Rate limit exceeded
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: Too Many Requests
+
+        '500':
+          description: Internal server error
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: internal server error
+
+  /info:
+    post:
+      tags:
+        - Threats
+      summary: Create a new threat
+      operationId: createThreat
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThreatCreateRequest'
+
+      responses:
+        '201':
+          description: Threat successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateResult'
+
+        '400':
+          description: Invalid request data
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: Bad request
+
+        '401':
+          description: Unauthorized - invalid or missing API key
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: Unauthorized
+
+        '409':
+          description: Threat with this MD5 already exists
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: Threat already exists
+
+        '429':
+          description: Rate limit exceeded
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: Too Many Requests
+
+        '500':
+          description: Internal server error
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: internal server error
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    ThreatCreateRequest:
+      type: object
+      required:
+        - md5
+        - name
+        - type
+        - severity
+      properties:
+        md5:
+          type: string
+          pattern: '^[a-fA-F0-9]{32}$'
+          example: d41d8cd98f00b204e9800998ecf8427e
+
+        sha256:
+          type: string
+          nullable: true
+          pattern: '^[a-fA-F0-9]{64}$'
+
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: Emotet
+
+        family:
+          type: string
+          nullable: true
+          maxLength: 100
+
+        type:
+          type: string
+          enum:
+            - trojan
+            - ransomware
+            - worm
+            - spyware
+            - virus
+            - rootkit
+            - backdoor
+            - adware
+            - other
+          example: trojan
+
+        severity:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+            - critical
+          example: high
+
+        confidence:
+          type: integer
+          format: int16
+          nullable: true
+          minimum: 0
+          maximum: 100
+
+        description:
+          type: string
+          nullable: true
+
+        tags:
+          type: array
+          items:
+            type: string
+          example:
+            - malware
+            - banking
+
+        source:
+          type: string
+          nullable: true
+          maxLength: 255
+
+    ThreatUpdateRequest:
+      type: object
+      required:
+        - name
+        - type
+        - severity
+      properties:
+        sha256:
+          type: string
+          nullable: true
+          pattern: '^[a-fA-F0-9]{64}$'
+
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+
+        family:
+          type: string
+          nullable: true
+          maxLength: 100
+
+        type:
+          type: string
+          enum:
+            - trojan
+            - ransomware
+            - worm
+            - spyware
+            - virus
+            - rootkit
+            - backdoor
+            - adware
+            - other
+
+        severity:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+            - critical
+
+        confidence:
+          type: integer
+          format: int16
+          nullable: true
+          minimum: 0
+          maximum: 100
+
+        description:
+          type: string
+          nullable: true
+
+        tags:
+          type: array
+          items:
+            type: string
+
+        source:
+          type: string
+          nullable: true
+          maxLength: 255
+
+    ThreatResponse:
+      type: object
+      required:
+        - id
+        - md5
+        - name
+        - type
+        - severity
+        - tags
+      properties:
+        id:
+          type: integer
+          format: int64
+
+        md5:
+          type: string
+          pattern: '^[a-fA-F0-9]{32}$'
+
+        sha256:
+          type: string
+          nullable: true
+
+        name:
+          type: string
+
+        family:
+          type: string
+          nullable: true
+
+        type:
+          type: string
+
+        severity:
+          type: string
+
+        confidence:
+          type: integer
+          format: int16
+          nullable: true
+
+        description:
+          type: string
+          nullable: true
+
+        tags:
+          type: array
+          items:
+            type: string
+
+        source:
+          type: string
+          nullable: true
+      
+    CreateResult:
+      type: object
+      required:
+        - md5
+        - name
+      properties:
+        md5:
+          type: string
+          pattern: '^[a-fA-F0-9]{32}$'
+          example: "d41d8cd98f00b204e9800998ecf8427e"
+        name:
+          type: string
+          example: "Example malware"
+      

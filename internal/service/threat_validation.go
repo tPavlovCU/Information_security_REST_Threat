@@ -2,7 +2,6 @@ package service
 
 import (
 	"errors"
-	"fmt"
 	"regexp"
 	"strings"
 
@@ -14,7 +13,6 @@ var md5Regex = regexp.MustCompile(`^[a-fA-F0-9]{32}$`)
 func validateMD5(md5 string) error {
 	ok := md5Regex.MatchString(md5)
 	if !ok {
-		fmt.Println("not validated")
 		return domain.ErrBadMD5
 	}
 	return nil
@@ -35,7 +33,7 @@ func validateThreat(threat *domain.Threat) error {
 
 	//проверка Name
 	name := threat.Name
-	name = strings.TrimSpace(name)
+	threat.Name = strings.TrimSpace(name)
 	if name == "" {
 		return domain.ErrEmptyName
 	}

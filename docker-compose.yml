@@ -6,7 +6,7 @@ services:
 
     environment:
       POSTGRES_USER: threat_user
-      POSTGRES_PASSWORD: secret
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: threats_db
 
     ports:
@@ -14,6 +14,35 @@ services:
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U threat_user -d threats_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: deployments/Dockerfile
+    container_name: threat-intelligence-api
+    restart: unless-stopped
+
+    environment:
+      HTTP_PORT: ${HTTP_PORT}
+      DATABASE_URL: ${DATABASE_URL}
+      HTTP_READ_TIMEOUT: ${HTTP_READ_TIMEOUT}
+      HTTP_WRITE_TIMEOUT: ${HTTP_WRITE_TIMEOUT}
+      API_KEY: ${API_KEY}
+      RATE_LIMIT: ${RATE_LIMIT}
+      RATE_WINDOW: ${RATE_WINDOW}
+
+    ports:
+      - "8080:8080"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:

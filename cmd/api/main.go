@@ -62,11 +62,12 @@ func main() {
 	var handler http.Handler = mux
 	limiter := middleware.NewRateLimiter(cfg.RateLimit, cfg.RateWindow)
 
-	handler = middleware.RequestIDMiddleware(handler)
-	handler = middleware.LoggingMiddleware(logger, handler)
 	handler = middleware.APIKeyMiddleware(cfg.APIKey, handler)
-	handler = middleware.RecoveryMiddleware(logger, handler)
 	handler = middleware.RateLimitMiddleware(limiter, handler)
+	handler = middleware.SecurityHeadersMiddleware(handler)
+	handler = middleware.RecoveryMiddleware(logger, handler)
+	handler = middleware.LoggingMiddleware(logger, handler)
+	handler = middleware.RequestIDMiddleware(handler)
 
 	server := &http.Server{
 		Addr:         ":" + cfg.HTTPPort,
