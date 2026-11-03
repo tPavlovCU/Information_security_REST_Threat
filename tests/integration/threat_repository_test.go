@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -12,10 +13,13 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const testDBURL = "postgres://threat_user:secret@localhost:5432/threats_test_db?sslmode=disable"
-
 func setupTestDB(t *testing.T) *pgxpool.Pool {
 	t.Helper()
+
+	testDBURL := os.Getenv("DATABASE_URL")
+	if testDBURL == "" {
+		t.Fatal("DATABASE_URL environment variable is not set")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
