@@ -61,8 +61,9 @@ func main() {
 
 	var handler http.Handler = mux
 
-	handler = middleware.LoggingMiddleware(logger, handler)
 	handler = middleware.RequestIDMiddleware(handler)
+	handler = middleware.LoggingMiddleware(logger, handler)
+	handler = middleware.RecoveryMiddleware(logger, handler)
 
 	server := &http.Server{
 		Addr:         ":" + cfg.HTTPPort,
